@@ -3,62 +3,62 @@ import struct
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("Text")
+parser.add_argument("text")
 args = parser.parse_args()
 
+groups = []
+f0 = open(args.text, 'r')
+f1 = open(args.text[:-4] + ".slb", "wb")
 
-newarr = []
-f0 = open(args.Text,"rb")
-
-f2 = open("out.slb","wb")
-totalstringsbytes = 0x04
-strgroupcount = 0x00
+print("Creating SoundTable...")
 line = f0.readline()
-while line:
-    #print line.strip()
-    new = line.strip()
-    new2 = new.split(",")
-    #print new2
-    newarr += [new2]
-    strgroupcount += 0x01
-    totalstringsbytes += 0x0c
 
+while line:
+    editedLine = line.strip()
+    groupData = editedLine.split(',')
+    groups += [groupData]
     line = f0.readline()
 
-pointer = strgroupcount * 0x0c + 0x8
+groupCount = len(groups)
+f1.write(struct.pack('I', groupCount))
+f1.write(struct.pack('I', 0x08))
+pointer = groupCount * 0x0C + 0x08
 
-f2.write(struct.pack("i", strgroupcount))
-f2.write(struct.pack("i", 0x08))
+for i in range(0, groupCount):
+    f1.write(struct.pack('I', pointer))
+    print("Pointer: " + hex(pointer))
+    getBack = f1.tell()
+    f1.seek(pointer, os.SEEK_SET)
+    length = len(groups[i][0])
+    f1.write(struct.pack('B', length))
+    f1.write(groups[i][0].encode())
+    print("Name: " + groups[i][0])
+    f1.write(struct.pack('B', 0x00))
+    f1.seek(getBack, os.SEEK_SET)
+    f1.write(struct.pack('I', int(groups[i][1])))
+    print("Variety: " + groups[i][1])
+    f1.write(struct.pack('f', float(groups[i][2])))
+    print("Volume: " + groups[i][2])
+    pointer += length + 0x02
 
-for i in range(0,strgroupcount):
-    f2.write(struct.pack("i", pointer))
-    getBack = f2.tell()
-    print "Pointer: " + hex(pointer)
-    f2.seek(pointer, os.SEEK_SET)
-    get = len(newarr[i][0])
-    f2.write(bytearray([get]))
-    f2.write(newarr[i][0])
-    f2.write(bytearray([0]))
-    f2.seek(getBack, os.SEEK_SET)
-    f2.write(struct.pack("i", int(newarr[i][1])))
-    f2.write(struct.pack("f", float(newarr[i][2])))
-    totalstringsbytes += get + 0x02
-    pointer += 0x02 + get
-
-f2.seek(pointer, os.SEEK_SET)
+f1.seek(pointer, os.SEEK_SET)
+totalBytes = pointer
 
 # Handle padding
+while totalBytes % 0x04 != 0x00:
+    f1.write(struct.pack('B', 0x00))
+    totalBytes += 0x01
 
-while totalstringsbytes % 0x04 != 0x00:
-    f2.write(bytearray([0]))
-    totalstringsbytes += 0x01
-
+f1.write(struct.pack('I', 0x04))
 pointer = 0x08
-f2.write(struct.pack("i", 0x04))
 
-for i in range(0,strgroupcount):
-    f2.write(struct.pack("i", pointer))
-    pointer+=0x0c
+for i in range(0, groupCount):
+    f1.write(struct.pack('I', pointer))
+    print("Pointer: " + hex(pointer))
+    pointer += 0x0C
 
-f2.write(struct.pack("i", strgroupcount + 0x01))
-f2.write(struct.pack("i", 0xC0FFEE))
+f1.write(struct.pack('I', groupCount + 0x01))
+f1.write(struct.pack('I', 0x00C0FFEE))
+print("Done!")
+f0.close()
+f1.close()
